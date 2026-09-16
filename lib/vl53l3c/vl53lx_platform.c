@@ -38,6 +38,7 @@ unsigned int i2cwriteCount = 0;
 unsigned char SPI2C_Buffer[256];
 
 #include <vl53lx_platform.h>
+#include "../../include/arduino_esp32_compat.h"
 #ifndef SMALL_FOOTPRINT
 #include <vl53lx_platform_ipp.h>
 #endif
@@ -60,7 +61,7 @@ unsigned char SPI2C_Buffer[256];
 #endif
 
 
-i2c_cmd_handle_t i2chandle;
+static i2c_cmd_handle_t i2chandle;
 
 //#ifndef HAL_I2C_MODULE_ENABLED
 //#warning "HAL I2C module must be enable "
@@ -70,7 +71,7 @@ i2c_cmd_handle_t i2chandle;
 
 
 
-uint8_t _I2CBuffer[256];
+static uint8_t _I2CBuffer[256];
 
 
 #define I2C_MASTER_SDA_IO 3
@@ -121,7 +122,7 @@ int vl53lx_i2c_init(void)
 {
     int status=0;
     //i2c_driver_delete(i2c_master_port);
-    ets_delay_us(100000);
+    stampfly_delay_us(100000);
     //delay(100);
     //status = i2c_param_config(i2c_master_port, &conf);
     //status = status|i2c_driver_install(i2c_master_port, conf.mode, 0, 0, 0);
@@ -392,14 +393,14 @@ VL53LX_Error VL53LX_GetTimerFrequency(int32_t *ptimer_freq_hz)
 
 VL53LX_Error VL53LX_WaitMs(VL53LX_Dev_t *pdev, int32_t wait_ms){
 	(void)pdev;
-    ets_delay_us(wait_ms*1000);
+    stampfly_delay_us(wait_ms*1000);
 	//delay(wait_ms);
     return VL53LX_ERROR_NONE;
 }
 
 VL53LX_Error VL53LX_WaitUs(VL53LX_Dev_t *pdev, int32_t wait_us){
 	(void)pdev;
-    ets_delay_us(wait_us);   
+    stampfly_delay_us(wait_us);
 	//delay(wait_us/1000);
     return VL53LX_ERROR_NONE;
 }

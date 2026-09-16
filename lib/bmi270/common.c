@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "../../include/arduino_esp32_compat.h"
 //#include "bmi2_defs.h"
 
 //#include "driver/i2c.h"
@@ -39,7 +40,7 @@ static struct coines_intf_config intf_conf;
 struct bmi2_dev Bmi270;
 struct bmi2_dev *pBmi270=&Bmi270;
 
-i2c_cmd_handle_t i2chandle;
+static i2c_cmd_handle_t i2chandle;
 
 // SPIデバイスハンドラーを使って通信する
 spi_device_handle_t spidev;
@@ -50,7 +51,7 @@ i2c_port_t i2c_port=1;
 
 uint8_t Bmi270_address = 0x69; 
 
-uint8_t _I2CBuffer[256];
+static uint8_t _I2CBuffer[256];
 
 struct bmi2_sens_config config;
 
@@ -256,7 +257,7 @@ BMI2_INTF_RETURN_TYPE bmi2_spi_write(uint8_t reg_addr, const uint8_t *reg_data, 
 void bmi2_delay_us(uint32_t period, void *intf_ptr)
 {
     //coines_delay_usec(period);
-    ets_delay_us(period);
+    stampfly_delay_us(period);
 }
 
 /*!

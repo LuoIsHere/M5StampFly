@@ -24,6 +24,7 @@
  */
 
 #include "sensor.hpp"
+#include "arduino_esp32_compat.h"
 #include "imu.hpp"
 #include "tof.hpp"
 #include "flight_control.hpp"

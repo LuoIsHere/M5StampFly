@@ -28,6 +28,7 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include "flight_control.hpp"
+#include "arduino_esp32_compat.h"
 
 // esp_now_peer_info_t slave;
 
@@ -50,10 +51,14 @@ esp_now_peer_info_t peerInfo;
 volatile float Stick[16];
 volatile uint8_t Recv_MAC[3];
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+void on_esp_now_sent(const esp_now_send_info_t *tx_info, esp_now_send_status_t status);
+#else
 void on_esp_now_sent(const uint8_t *mac_addr, esp_now_send_status_t status);
+#endif
 
-// 受信コールバック
-void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len) {
+// 受信数据公共处理逻辑
+static void handle_received_data(const uint8_t *src_mac, const uint8_t *recv_data, int data_len) {
     Connect_flag = 0;
 
     uint8_t *d_int;
@@ -61,7 +66,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len)
     float d_float;
 
     if (!TelemAddr[0] && !TelemAddr[1] && !TelemAddr[2] && !TelemAddr[3] && !TelemAddr[4] && !TelemAddr[5]) {
-        memcpy(TelemAddr, mac_addr, 6);
+        memcpy(TelemAddr, src_mac, 6);
         memcpy(peerInfo.peer_addr, TelemAddr, 6);
         peerInfo.channel = CHANNEL;
         peerInfo.encrypt = false;
@@ -142,11 +147,30 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len)
 #endif
 }
 
+// 受信回调外壳
+#if STAMPFLY_ARDUINO_ESP32_V3
+void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *recv_data, int data_len) {
+    handle_received_data(info->src_addr, recv_data, data_len);
+}
+#else
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len) {
+    handle_received_data(mac_addr, recv_data, data_len);
+}
+#endif
+
 // 送信コールバック
 uint8_t esp_now_send_status;
-void on_esp_now_sent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+void on_esp_now_sent(const esp_now_send_info_t *tx_info, esp_now_send_status_t status) {
+    (void)tx_info;
     esp_now_send_status = status;
 }
+#else
+void on_esp_now_sent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+    (void)mac_addr;
+    esp_now_send_status = status;
+}
+#endif
 
 void rc_init(void) {
     // Initialize Stick list
