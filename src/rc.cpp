@@ -29,6 +29,9 @@
 #include <esp_wifi.h>
 #include "flight_control.hpp"
 #include "arduino_esp32_compat.h"
+#if STAMPFLY_ARDUINO_ESP32_V3
+#include <esp_mac.h>
+#endif
 
 // esp_now_peer_info_t slave;
 
@@ -180,7 +183,25 @@ void rc_init(void) {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
 
+#if STAMPFLY_ARDUINO_ESP32_V3
+    esp_err_t mac_status = esp_read_mac((uint8_t *)MyMacAddr, ESP_MAC_WIFI_STA);
+    bool mac_valid       = (mac_status == ESP_OK);
+    bool mac_is_zero     = true;
+    for (uint8_t i = 0; i < sizeof(MyMacAddr); i++) {
+        if (MyMacAddr[i] != 0) {
+            mac_is_zero = false;
+            break;
+        }
+    }
+    mac_valid = mac_valid && !mac_is_zero;
+    if (!mac_valid) {
+        memset((uint8_t *)MyMacAddr, 0, sizeof(MyMacAddr));
+        USBSerial.printf("Invalid WiFi STA MAC (esp_read_mac status: %d); pairing broadcast disabled.\r\n",
+                         (int)mac_status);
+    }
+#else
     WiFi.macAddress((uint8_t *)MyMacAddr);
+#endif
     USBSerial.printf("MAC ADDRESS: %02X:%02X:%02X:%02X:%02X:%02X\r\n", MyMacAddr[0], MyMacAddr[1], MyMacAddr[2],
                      MyMacAddr[3], MyMacAddr[4], MyMacAddr[5]);
 
@@ -203,11 +224,23 @@ void rc_init(void) {
     esp_wifi_set_channel(CHANNEL, WIFI_SECOND_CHAN_NONE);
 
     // Send my MAC address
+#if STAMPFLY_ARDUINO_ESP32_V3
+    if (mac_valid) {
+        for (uint16_t i = 0; i < 50; i++) {
+            send_peer_info();
+            delay(50);
+            USBSerial.printf("%d\n", i);
+        }
+    } else {
+        USBSerial.println("Pairing broadcast skipped because WiFi STA MAC is invalid.");
+    }
+#else
     for (uint16_t i = 0; i < 50; i++) {
         send_peer_info();
         delay(50);
         USBSerial.printf("%d\n", i);
     }
+#endif
 
     // ESP-NOW再初期化
     WiFi.mode(WIFI_STA);

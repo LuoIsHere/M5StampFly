@@ -258,6 +258,9 @@ void init_copter(void) {
     USBSerial.begin(115200);
     delay(1500);
     USBSerial.printf("Start StampFly!\r\n");
+#if STAMPFLY_ARDUINO_ESP32_V3
+    USBSerial.printf("Environment: Arduino-ESP32 %s (3.x compatibility branch)\r\n", ESP_ARDUINO_VERSION_STR);
+#endif
 
     // Initialize PWM
     init_pwm();
