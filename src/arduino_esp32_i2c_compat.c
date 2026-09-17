@@ -5,7 +5,7 @@
 #include <esp_err.h>
 #include <esp32-hal-i2c.h>
 
-#define STAMPFLY_I2C_TIMEOUT_MS 1U
+#define STAMPFLY_I2C_TIMEOUT_MS 50U
 
 int stampfly_i2c_write(uint8_t i2c_num, uint16_t address, const uint8_t *data, size_t length)
 {
