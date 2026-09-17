@@ -38,7 +38,7 @@ unsigned int i2cwriteCount = 0;
 unsigned char SPI2C_Buffer[256];
 
 #include <vl53lx_platform.h>
-#include "../../include/arduino_esp32_compat.h"
+#include "../../include/arduino_esp32_i2c_compat.h"
 #ifndef SMALL_FOOTPRINT
 #include <vl53lx_platform_ipp.h>
 #endif
@@ -50,7 +50,9 @@ unsigned char SPI2C_Buffer[256];
 #include <math.h>
 
 //#include "esp_log.h"
+#if !STAMPFLY_ARDUINO_ESP32_V3
 #include "driver/i2c.h"
+#endif
 
 #define I2C_TIME_OUT_BASE   10
 #define I2C_TIME_OUT_BYTE   1
@@ -61,7 +63,19 @@ unsigned char SPI2C_Buffer[256];
 #endif
 
 
+#if STAMPFLY_ARDUINO_ESP32_V3
+typedef struct {
+    uint8_t address;
+    const uint8_t *write_data;
+    uint32_t write_count;
+    uint8_t *read_data;
+    uint32_t read_count;
+} stampfly_i2c_transaction_t;
+
+static stampfly_i2c_transaction_t i2c_transaction;
+#else
 static i2c_cmd_handle_t i2chandle;
+#endif
 
 //#ifndef HAL_I2C_MODULE_ENABLED
 //#warning "HAL I2C module must be enable "
@@ -83,6 +97,7 @@ static uint8_t _I2CBuffer[256];
 #define I2C_MASTER_TIMEOUT_MS       1000
 //#define I2C_SENSOR_ADDR 0x29
 
+#if !STAMPFLY_ARDUINO_ESP32_V3
 int i2c_master_port = I2C_MASTER_NUM;
 i2c_config_t conf = {
     .mode = I2C_MODE_MASTER,
@@ -93,6 +108,7 @@ i2c_config_t conf = {
     .master.clk_speed = I2C_MASTER_FREQ_HZ,  // select frequency specific to your project
     .clk_flags = 0,                          // optional; you can use I2C_SCLK_SRC_FLAG_* flags to choose i2c source clock here
 };
+#endif
 
 /* when not customized by application define dummy one */
 //#ifndef VL53LX_GetI2cBus
@@ -102,7 +118,15 @@ i2c_config_t conf = {
 //#endif
 void VL53LX_GetI2cBus(void)
 {
+#if STAMPFLY_ARDUINO_ESP32_V3
+    i2c_transaction.address = 0;
+    i2c_transaction.write_data = NULL;
+    i2c_transaction.write_count = 0;
+    i2c_transaction.read_data = NULL;
+    i2c_transaction.read_count = 0;
+#else
     i2chandle = i2c_cmd_link_create();
+#endif
 }
 
 //#ifndef VL53LX_PutI2cBus
@@ -113,9 +137,30 @@ void VL53LX_GetI2cBus(void)
 
 void VL53LX_PutI2cBus(void)
 {
+#if STAMPFLY_ARDUINO_ESP32_V3
+    if ((i2c_transaction.write_count != 0U) && (i2c_transaction.read_count != 0U)) {
+        (void)stampfly_i2c_write_read(I2C_MASTER_NUM,
+                                      i2c_transaction.address,
+                                      i2c_transaction.write_data,
+                                      i2c_transaction.write_count,
+                                      i2c_transaction.read_data,
+                                      i2c_transaction.read_count);
+    } else if (i2c_transaction.write_count != 0U) {
+        (void)stampfly_i2c_write(I2C_MASTER_NUM,
+                                 i2c_transaction.address,
+                                 i2c_transaction.write_data,
+                                 i2c_transaction.write_count);
+    } else if (i2c_transaction.read_count != 0U) {
+        (void)stampfly_i2c_read(I2C_MASTER_NUM,
+                                i2c_transaction.address,
+                                i2c_transaction.read_data,
+                                i2c_transaction.read_count);
+    }
+#else
     i2c_master_stop(i2chandle);
     i2c_master_cmd_begin(i2c_master_port,i2chandle, 1 / portTICK_RATE_MS);
     i2c_cmd_link_delete(i2chandle);
+#endif
 }
 
 int vl53lx_i2c_init(void)
@@ -130,15 +175,36 @@ int vl53lx_i2c_init(void)
 }
 
 int _I2CWrite(VL53LX_DEV Dev, uint8_t *pdata, uint32_t count) {
+#if STAMPFLY_ARDUINO_ESP32_V3
+    if ((Dev == NULL) || ((pdata == NULL) && (count != 0U))) {
+        return -1;
+    }
+
+    i2c_transaction.address = Dev->i2c_slave_address;
+    i2c_transaction.write_data = pdata;
+    i2c_transaction.write_count = count;
+    return 0;
+#else
     int status;
     
     i2c_master_start(i2chandle);
     status = i2c_master_write_byte(i2chandle, (Dev->i2c_slave_address<<1)|I2C_MASTER_WRITE, I2C_MASTER_ACK);
     status = i2c_master_write(i2chandle, pdata, count, I2C_MASTER_ACK);
     return status;
+#endif
 }
 
 int _I2CRead(VL53LX_DEV Dev, uint8_t *pdata, uint32_t count) {
+#if STAMPFLY_ARDUINO_ESP32_V3
+    if ((Dev == NULL) || ((pdata == NULL) && (count != 0U))) {
+        return -1;
+    }
+
+    i2c_transaction.address = Dev->i2c_slave_address;
+    i2c_transaction.read_data = pdata;
+    i2c_transaction.read_count = count;
+    return 0;
+#else
     int status;
 
     i2c_master_start(i2chandle);
@@ -149,6 +215,7 @@ int _I2CRead(VL53LX_DEV Dev, uint8_t *pdata, uint32_t count) {
     }
     status = i2c_master_read_byte(i2chandle, pdata+count-1, I2C_MASTER_NACK);
     return status;
+#endif
 }
 
 VL53LX_Error VL53LX_WriteMulti(VL53LX_DEV Dev, uint16_t index, uint8_t *pdata, uint32_t count) {
